@@ -1,3 +1,7 @@
 spring:
   application:
-    name: technical_test
+    name: demo
+
+api:
+  external:
+    baseUrl: https://petstore.swagger.io/v2/pet
