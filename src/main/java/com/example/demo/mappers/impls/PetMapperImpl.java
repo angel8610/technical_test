@@ -6,9 +6,11 @@ import com.example.demo.mappers.PetMapper;
 import com.example.demo.vos.CategoryVO;
 import com.example.demo.vos.PetVO;
 import com.example.demo.vos.TagVO;
+import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
+@Component
 public class PetMapperImpl implements PetMapper {
 
   @Override
