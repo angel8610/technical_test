@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +23,7 @@ public class AdviceController {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
   }
 
-  @ExceptionHandler(PetException.class)
+  @ExceptionHandler({RestClientException.class, PetException.class})
   public ResponseEntity<ExceptionBodyVO> handlePetException(PetException ex) {
     var body = new ExceptionBodyVO(HttpStatus.INTERNAL_SERVER_ERROR.value(), ex.getMessage());
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(body);
