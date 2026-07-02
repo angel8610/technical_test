@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "api.external")
 public class HttpClientProperties {
 
-  public String baseUrl;
+  private String baseUrl;
 
   public String getBaseUrl() {
     return baseUrl;

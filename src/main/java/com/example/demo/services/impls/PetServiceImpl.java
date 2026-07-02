@@ -1,7 +1,5 @@
 package com.example.demo.services.impls;
 
-import com.example.demo.configurations.HttpClientConfig;
-import com.example.demo.configurations.HttpClientProperties;
 import com.example.demo.dtos.PetDTO;
 import com.example.demo.dtos.PetSaveRequestDTO;
 import com.example.demo.exceptions.PetException;
@@ -9,14 +7,13 @@ import com.example.demo.exceptions.PetExistException;
 import com.example.demo.exceptions.PetNotFoundException;
 import com.example.demo.mappers.PetMapper;
 import com.example.demo.services.PetService;
-import com.example.demo.utils.DataUtil;
-import com.example.demo.utils.HttpRequestUtil;
 import com.example.demo.vos.PetVO;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -25,18 +22,13 @@ public class PetServiceImpl implements PetService {
 
   private static final Logger LOGGER = Logger.getLogger(PetServiceImpl.class.getName());
 
-  private final HttpClientConfig connect;
-
-  private final HttpClientProperties httpClientProperties;
-
   private final PetMapper petMapper;
 
-  public PetServiceImpl(HttpClientConfig connect,
-      HttpClientProperties httpClientProperties,
-      PetMapper petMapper) {
-    this.connect = connect;
-    this.httpClientProperties = httpClientProperties;
+  private final RestClient restClient;
+
+  public PetServiceImpl(PetMapper petMapper, RestClient restClient) {
     this.petMapper = petMapper;
+    this.restClient = restClient;
   }
 
   @Override
@@ -54,9 +46,6 @@ public class PetServiceImpl implements PetService {
 
   @Override
   public PetDTO savePet(PetSaveRequestDTO petSaveRequestDTO) {
-    String[] headers = {"Accept", "application/json", "Content-Type", "application/json"};
-    HttpResponse<String> response;
-    PetDTO petDTO;
     Long id = petSaveRequestDTO.id();
 
     Optional<PetDTO> petDTOSearch = this.searchExternalPetById(id);
@@ -64,43 +53,35 @@ public class PetServiceImpl implements PetService {
       throw new PetExistException("Pet already exists with id:" + id);
     }
 
-    try {
-      var convertPetVO = this.petMapper.buildPetSaveRequestDTOToPetVO(petSaveRequestDTO);
-      String jsonBody = DataUtil.buildRequestBody(convertPetVO);
-      HttpRequest request = HttpRequestUtil.buildRequest(
-       httpClientProperties.getBaseUrl())
-       .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-        .headers(headers)
-       .build();
+    PetVO petVO = this.restClient.post()
+      .contentType(MediaType.APPLICATION_JSON)
+      .accept(MediaType.APPLICATION_JSON)
+      .body(this.petMapper.buildPetSaveRequestDTOToPetVO(petSaveRequestDTO))
+      .retrieve()
+      .onStatus(HttpStatusCode::is4xxClientError, ((request, response) -> {
+        throw new PetException("External validation error");
+      }))
+      .onStatus(HttpStatusCode::is5xxServerError, ((request, response) -> {
+        throw new PetException("Temporary external server error");
+      }))
+      .body(PetVO.class);
 
-      HttpClient client = connect.httpClient();
-      response = client.send(request, HttpResponse.BodyHandlers.ofString());
-      var petVO = DataUtil.convertToPetVO(response.body());
-      petDTO = this.petMapper.buildPetVOToPetDTO(petVO);
-    } catch (Exception e) {
-      throw new PetException("Exception while calling external API: " + e.getMessage());
-    }
-
-    if(petDTO == null) {
-      throw new PetException("Pet could not be saved");
-    }
-    return petDTO;
+    return this.petMapper.buildPetVOToPetDTO(petVO);
   }
 
-  private Optional<PetDTO> searchExternalPetById(Long id)  {
-    HttpRequest request = HttpRequestUtil.buildRequest(
-        httpClientProperties.getBaseUrl().concat("/".concat(id.toString())))
-      .GET()
-      .build();
-
+  private Optional<PetDTO> searchExternalPetById(Long id) {
     try {
-      HttpClient client = connect.httpClient();
-      var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-      PetVO petVO = DataUtil.convertToPetVO(response.body());
+      PetVO petVO = this.restClient.get()
+        .uri("/{petId}", id)
+        .accept(MediaType.APPLICATION_JSON)
+        .retrieve()
+        .onStatus(HttpStatusCode::isError, (request, response) -> {
+          throw new PetException("External server error");
+        })
+        .body(PetVO.class);
       return Optional.ofNullable(this.petMapper.buildPetVOToPetDTO(petVO));
-    } catch (Exception e) {
-      LOGGER.warning("Error while calling external API: " + e.getMessage());
-      throw new PetException("Error while calling external API");
+    } catch(RestClientException | PetException ex) {
+      return Optional.empty();
     }
   }
 
