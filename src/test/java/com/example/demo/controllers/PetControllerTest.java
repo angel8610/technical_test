@@ -14,7 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
-import static java.time.LocalDateTime.now;
+import java.time.ZoneId;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -75,23 +76,30 @@ class PetControllerTest {
   @Test
   void savePetReturnsOkWithPetSaveResponseDTO() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetSaveResponseDTO responseDTO = new PetSaveResponseDTO(
-      "TXN-001", now(), true, "PetName");
-    when(petService.savePet(requestDTO)).thenReturn(responseDTO);
+    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
+    when(petService.savePet(requestDTO)).thenReturn(petDTO);
 
     ResponseEntity<PetSaveResponseDTO> resp = petController.savePet(requestDTO);
 
     assertNotNull(resp);
-    assertEquals(200, resp.getStatusCode().value());
-    assertEquals(responseDTO, resp.getBody());
+    assertEquals(201, resp.getStatusCode().value());
     verify(petService, times(1)).savePet(requestDTO);
+    PetSaveResponseDTO body = resp.getBody();
+
+    assertNotNull(body);
+    assertTrue(body.isStatus());
+    assertNotNull(body.getTransactionId());
+    assertFalse(body.getTransactionId().isEmpty());
+    assertNotNull(body.getDateCreated());
+    assertEquals(ZoneId.of("UTC"), body.getDateCreated().atZone(
+      ZoneId.of("UTC")).getZone());
   }
 
   @Test
   void savePetShouldCallServiceWithCorrectDTO() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetSaveResponseDTO responseDTO = new PetSaveResponseDTO("TXN-001", now(), true, "PetName");
-    when(petService.savePet(requestDTO)).thenReturn(responseDTO);
+    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
+    when(petService.savePet(requestDTO)).thenReturn(petDTO);
 
     petController.savePet(requestDTO);
 
@@ -110,9 +118,8 @@ class PetControllerTest {
   @Test
   void savePetResponseIsNotNull() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetSaveResponseDTO responseDTO = new PetSaveResponseDTO(
-      "TXN-001", now(), true, "PetName");
-    when(petService.savePet(requestDTO)).thenReturn(responseDTO);
+    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
+    when(petService.savePet(requestDTO)).thenReturn(petDTO);
 
     ResponseEntity<PetSaveResponseDTO> resp = petController.savePet(requestDTO);
 

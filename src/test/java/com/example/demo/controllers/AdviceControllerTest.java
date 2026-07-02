@@ -9,6 +9,8 @@ import com.example.demo.exceptions.PetNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.example.demo.vos.ExceptionBodyVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -22,14 +24,15 @@ class AdviceControllerTest {
     AdviceController controller = new AdviceController();
     String msg = "Pet not found with id: 123";
 
-    ResponseEntity<Map<String, Object>> response = controller.handlePetNotFound(new PetNotFoundException(msg));
+    ResponseEntity<ExceptionBodyVO> response = controller.handlePetNotFound(
+      new PetNotFoundException(msg));
 
     assertNotNull(response);
     assertEquals(404, response.getStatusCode().value());
-    Map<String, Object> body = response.getBody();
+    ExceptionBodyVO body = response.getBody();
     assertNotNull(body);
-    assertEquals(404, body.get("code"));
-    assertEquals(msg, body.get("message"));
+    assertEquals(404, body.getCode());
+    assertEquals(msg, body.getMessage());
   }
 
   @Test
@@ -37,14 +40,15 @@ class AdviceControllerTest {
     AdviceController controller = new AdviceController();
     String msg = "Invalid request";
 
-    ResponseEntity<Map<String, Object>> response = controller.handlePetException(new PetException(msg));
+    ResponseEntity<ExceptionBodyVO> response = controller.handlePetException(
+      new PetException(msg));
 
     assertNotNull(response);
     assertEquals(500, response.getStatusCode().value());
-    Map<String, Object> body = response.getBody();
+    ExceptionBodyVO body = response.getBody();
     assertNotNull(body);
-    assertEquals(500, body.get("code"));
-    assertEquals(msg, body.get("message"));
+    assertEquals(500, body.getCode());
+    assertEquals(msg, body.getMessage());
   }
 
   @Test
@@ -61,18 +65,17 @@ class AdviceControllerTest {
       "object", "status", "Status is required"));
     when(bindingResult.getFieldErrors()).thenReturn(fieldErrors);
 
-    ResponseEntity<Map<String, Object>> response =
+    ResponseEntity<ExceptionBodyVO> response =
         controller.handleMethodArgumentNotValidException(exception);
 
     assertNotNull(response);
     assertEquals(400, response.getStatusCode().value());
-    Map<String, Object> body = response.getBody();
+    ExceptionBodyVO body = response.getBody();
     assertNotNull(body);
-    assertEquals(400, body.get("code"));
-    assertEquals("There are errors that need to be corrected.", body.get("message"));
+    assertEquals(400, body.getCode());
+    assertEquals("There are errors that need to be corrected.", body.getMessage());
 
-    @SuppressWarnings("unchecked")
-    Map<String, String> errors = (Map<String, String>) body.get("errors");
+    Map<String, String> errors = body.getErrors();
     assertNotNull(errors);
     assertEquals(2, errors.size());
     assertEquals("Name is required", errors.get("name"));
@@ -87,16 +90,15 @@ class AdviceControllerTest {
     when(exception.getBindingResult()).thenReturn(bindingResult);
     when(bindingResult.getFieldErrors()).thenReturn(new ArrayList<>());
 
-    ResponseEntity<Map<String, Object>> response =
+    ResponseEntity<ExceptionBodyVO> response =
         controller.handleMethodArgumentNotValidException(exception);
 
     assertNotNull(response);
     assertEquals(400, response.getStatusCode().value());
-    Map<String, Object> body = response.getBody();
+    ExceptionBodyVO body = response.getBody();
 
     assertNotNull(body);
-    @SuppressWarnings("unchecked")
-    Map<String, String> errors = (Map<String, String>) body.get("errors");
+    Map<String, String> errors = body.getErrors();
     assertTrue(errors.isEmpty());
   }
 

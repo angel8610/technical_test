@@ -2,6 +2,8 @@ package com.example.demo.vos;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Objects;
+
 public class CategoryVO {
 
   private Long id;
@@ -35,6 +37,25 @@ public class CategoryVO {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if(this == o) {
+      return true;
+    }
+
+    if(o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    CategoryVO categoryVO = (CategoryVO) o;
+    return id.equals(categoryVO.id);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id);
   }
 
 

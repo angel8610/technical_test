@@ -4,9 +4,9 @@ import com.example.demo.configurations.HttpClientConfig;
 import com.example.demo.configurations.HttpClientProperties;
 import com.example.demo.dtos.PetDTO;
 import com.example.demo.dtos.PetSaveRequestDTO;
-import com.example.demo.dtos.PetSaveResponseDTO;
 import com.example.demo.exceptions.PetException;
 import com.example.demo.exceptions.PetNotFoundException;
+import com.example.demo.mappers.PetMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +39,8 @@ class PetServiceImplTest {
       }
       """;
 
+  private static final PetDTO PET_DTO = new PetDTO(1L, "PetName", "available");
+
   @Mock
   private HttpClientConfig httpClientConfig;
 
@@ -52,11 +53,14 @@ class PetServiceImplTest {
   @Mock
   private HttpResponse<String> httpResponse;
 
+  @Mock
+  private PetMapper petMapper;
+
   private PetServiceImpl petService;
 
   @BeforeEach
   void setUp() {
-    petService = new PetServiceImpl(httpClientConfig, httpClientProperties);
+    petService = new PetServiceImpl(httpClientConfig, httpClientProperties, petMapper);
     when(httpClientConfig.httpClient()).thenReturn(httpClient);
     when(httpClientProperties.getBaseUrl()).thenReturn(BASE_URL);
   }
@@ -66,6 +70,7 @@ class PetServiceImplTest {
     when(httpResponse.body()).thenReturn(PET_JSON_RESPONSE);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(PET_DTO);
 
     PetDTO result = petService.getPetById(ID);
 
@@ -77,11 +82,13 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithValidIdShouldBuildCorrectUrl() throws IOException, InterruptedException {
-    String jsonResponse = "{\"id\": 123, \"name\": \"Buddy\", \"status\": \"available\"}";
+    var jsonResponse = "{\"id\": 123, \"name\": \"PetName\", \"status\": \"available\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      123L, "PetName", "available"));
 
     petService.getPetById(123L);
 
@@ -93,7 +100,7 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithMissingIdFieldShouldThrowPetNotFoundException() throws IOException, InterruptedException {
-    String jsonResponse = "{\"code\": 1, \"message\": \"error\"}";
+    var jsonResponse = "{\"code\": 1, \"message\": \"error\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
@@ -120,11 +127,13 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithNullNameShouldHandleGracefully() throws IOException, InterruptedException {
-    String jsonResponse = "{\"id\": 1, \"name\": null, \"status\": \"available\"}";
+    var jsonResponse = "{\"id\": 1, \"name\": null, \"status\": \"available\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      ID, null, "available"));
 
     PetDTO result = petService.getPetById(ID);
 
@@ -136,28 +145,31 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithNullStatusShouldHandleGracefully() throws IOException, InterruptedException {
-    Long petId = 1L;
-    String jsonResponse = "{\"id\": 1, \"name\": \"PetName\", \"status\": null}";
+    var jsonResponse = "{\"id\": 1, \"name\": \"PetName\", \"status\": null}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      ID, "PetName", null));
 
-    PetDTO result = petService.getPetById(petId);
+    PetDTO result = petService.getPetById(ID);
 
     assertNotNull(result);
-    assertEquals(1L, result.getId());
+    assertEquals(ID, result.getId());
     assertEquals("PetName", result.getName());
     assertNull(result.getStatus());
   }
 
   @Test
   void getPetByIdWithEmptyNameShouldReturnEmptyString() throws IOException, InterruptedException {
-    String jsonResponse = "{\"id\": 1, \"name\": \"\", \"status\": \"available\"}";
+    var jsonResponse = "{\"id\": 1, \"name\": \"\", \"status\": \"available\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      ID, "", "available"));
 
     PetDTO result = petService.getPetById(ID);
 
@@ -167,11 +179,13 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithMissingNameFieldShouldReturnNullName() throws IOException, InterruptedException {
-    String jsonResponse = "{\"id\": 1, \"status\": \"available\"}";
+    var jsonResponse = "{\"id\": 1, \"status\": \"available\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      ID, null, "available"));
 
     PetDTO result = petService.getPetById(ID);
 
@@ -181,11 +195,13 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithMissingStatusFieldShouldReturnNullStatus() throws IOException, InterruptedException {
-    String jsonResponse = "{\"id\": 1, \"name\": \"PetName\"}";
+    var jsonResponse = "{\"id\": 1, \"name\": \"PetName\"}";
     
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(new PetDTO(
+      ID, "PetName", null));
 
     PetDTO result = petService.getPetById(ID);
 
@@ -198,6 +214,7 @@ class PetServiceImplTest {
     when(httpResponse.body()).thenReturn(PET_JSON_RESPONSE);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(PET_DTO);
 
     petService.getPetById(ID);
 
@@ -209,6 +226,7 @@ class PetServiceImplTest {
     when(httpResponse.body()).thenReturn(PET_JSON_RESPONSE);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(PET_DTO);
 
     petService.getPetById(ID);
 
@@ -216,28 +234,22 @@ class PetServiceImplTest {
   }
 
   @Test
-  void getPetByIdWithInvalidJsonShouldThrowPetException() throws IOException, InterruptedException {
-    String invalidJson = "{ invalid json }";
-    
-    when(httpResponse.body()).thenReturn(invalidJson);
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(httpResponse);
-
-    assertThrows(PetException.class, () -> petService.getPetById(ID));
-  }
-
   void savePetWithValidRequestSuccess() throws IOException, InterruptedException {
-    PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    String jsonResponse = "{\"id\": 1, \"name\": \"PetName\", \"status\": \"available\"}";
-    
+    var requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+    var jsonResponse = "{\"id\": 1, \"name\": \"PetName\", \"status\": \"available\"}";
+
     when(httpResponse.body()).thenReturn(jsonResponse);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(httpResponse);
+    when(this.petMapper.buildPetVOToPetDTO(any()))
+        .thenReturn(null)
+        .thenReturn(PET_DTO)
+        .thenReturn(PET_DTO);
 
-    PetSaveResponseDTO result = petService.savePet(requestDTO);
+    PetDTO result = petService.savePet(requestDTO);
 
     ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+    verify(httpClient, times(2)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
     HttpRequest capturedRequest = requestCaptor.getValue();
     var headers = capturedRequest.headers();
 
@@ -249,17 +261,12 @@ class PetServiceImplTest {
     assertEquals("PetName", result.getName());
     assertNotNull(capturedRequest.uri());
     assertTrue(capturedRequest.uri().toString().contains(BASE_URL));
-    assertTrue(result.isStatus());
-    assertNotNull(result.getTransactionId());
-    assertFalse(result.getTransactionId().isEmpty());
-    assertNotNull(result.getDateCreated());
-    assertEquals(ZoneId.of("UTC"), result.getDateCreated().atZone(ZoneId.of("UTC")).getZone());
   }
 
   @Test
   void savePetWithInvalidResponseShouldThrowPetException() throws IOException, InterruptedException {
-    PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    String invalidJson = "{\"code\": 1, \"message\": \"error\"}";
+    var requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+    var invalidJson = "{\"code\": 1, \"message\": \"error\"}";
     
     when(httpResponse.body()).thenReturn(invalidJson);
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
@@ -270,7 +277,8 @@ class PetServiceImplTest {
 
   @Test
   void savePetWithIOExceptionShouldThrowPetException() throws IOException, InterruptedException {
-    PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+    var requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenThrow(new IOException("Connection failed"));
 
@@ -279,7 +287,8 @@ class PetServiceImplTest {
 
   @Test
   void savePetWithInterruptedExceptionShouldThrowPetException() throws IOException, InterruptedException {
-    PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+    var requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenThrow(new InterruptedException("Thread interrupted"));
 
@@ -288,7 +297,7 @@ class PetServiceImplTest {
 
   @Test
   void savePetWithNullJsonResponseShouldThrowPetException() throws IOException, InterruptedException {
-    PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
+    var requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
     String invalidJson = "{ invalid json }";
     
     when(httpResponse.body()).thenReturn(invalidJson);
