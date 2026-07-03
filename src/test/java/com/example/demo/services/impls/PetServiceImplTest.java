@@ -2,17 +2,20 @@ package com.example.demo.services.impls;
 
 import com.example.demo.dtos.PetDTO;
 import com.example.demo.dtos.PetSaveRequestDTO;
+import com.example.demo.dtos.PetSaveResponseDTO;
+import com.example.demo.exceptions.PetException;
 import com.example.demo.exceptions.PetExistException;
 import com.example.demo.exceptions.PetNotFoundException;
 import com.example.demo.mappers.PetMapper;
+import com.example.demo.services.PetExternalService;
 import com.example.demo.vos.PetVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,7 +29,7 @@ class PetServiceImplTest {
   private static final String STATUS_AVAILABLE = "available";
 
   @Mock
-  private RestClient restClient;
+  private PetExternalService petExternalService;
 
   @Mock
   private PetMapper petMapper;
@@ -35,26 +38,18 @@ class PetServiceImplTest {
 
   @BeforeEach
   void setUp() {
-    petService = new PetServiceImpl(petMapper, restClient);
-  }
-
-  private PetVO createPetVO(String name, String status) {
-    var petVO = new PetVO();
-    petVO.setId(PetServiceImplTest.ID);
-    petVO.setName(name);
-    petVO.setStatus(status);
-    return petVO;
+    this.petService = new PetServiceImpl(petMapper, petExternalService);
   }
 
   @Test
   void getPetByIdWithValidIdShouldReturnPetDTO() {
-    var petVO = createPetVO(PET_NAME, STATUS_AVAILABLE);
+    var petVO = createPetVO();
     var expectedDTO = new PetDTO(ID, PET_NAME, STATUS_AVAILABLE);
 
-    setupGetPetMock(petVO);
-    when(petMapper.buildPetVOToPetDTO(petVO)).thenReturn(expectedDTO);
+    when(this.petExternalService.findById(anyLong())).thenReturn(Optional.of(petVO));
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(expectedDTO);
 
-    PetDTO result = petService.getPetById(ID);
+    PetDTO result = this.petService.getPetById(ID);
 
     assertNotNull(result);
     assertEquals(ID, result.getId());
@@ -64,146 +59,71 @@ class PetServiceImplTest {
 
   @Test
   void getPetByIdWithValidIdShouldCallMapper() {
-    var petVO = createPetVO(PET_NAME, STATUS_AVAILABLE);
+    var petVO = createPetVO();
     var expectedDTO = new PetDTO(ID, PET_NAME, STATUS_AVAILABLE);
 
-    setupGetPetMock(petVO);
-    when(petMapper.buildPetVOToPetDTO(petVO)).thenReturn(expectedDTO);
+    when(this.petExternalService.findById(anyLong())).thenReturn(Optional.of(petVO));
+    when(this.petMapper.buildPetVOToPetDTO(any())).thenReturn(expectedDTO);
 
-    petService.getPetById(ID);
+    this.petService.getPetById(ID);
 
-    verify(petMapper).buildPetVOToPetDTO(petVO);
+    verify(this.petMapper).buildPetVOToPetDTO(petVO);
   }
 
   @Test
-  void getPetByIdWithNullResponseShouldThrowPetNotFoundException() {
-    setupGetPetMock(null);
-    when(petMapper.buildPetVOToPetDTO(null)).thenReturn(null);
-
-    assertThrows(PetNotFoundException.class, () -> petService.getPetById(ID));
+  void getPetByIdNotFoundThrowPetNotFoundException() {
+    when(this.petExternalService.findById(anyLong())).thenReturn(Optional.empty());
+    assertThrows(PetNotFoundException.class, () -> this.petService.getPetById(ID));
   }
 
   @Test
-  void getPetByIdWithNullNameShouldHandleGracefully() {
-    var petVO = createPetVO(null, STATUS_AVAILABLE);
-    var expectedDTO = new PetDTO(ID, null, STATUS_AVAILABLE);
-
-    setupGetPetMock(petVO);
-    when(petMapper.buildPetVOToPetDTO(petVO)).thenReturn(expectedDTO);
-
-    PetDTO result = petService.getPetById(ID);
-
-    assertNotNull(result);
-    assertNull(result.getName());
-    assertEquals(STATUS_AVAILABLE, result.getStatus());
+  void getPetByIdErrorServerResponseThrowPetException() {
+    when(this.petExternalService.findById(anyLong())).thenThrow(PetException.class);
+    assertThrows(PetException.class, () -> this.petService.getPetById(ID));
   }
 
   @Test
-  void getPetByIdWithNullStatusShouldHandleGracefully() {
-    var petVO = createPetVO(PET_NAME, null);
-    var expectedDTO = new PetDTO(ID, PET_NAME, null);
-
-    setupGetPetMock(petVO);
-    when(petMapper.buildPetVOToPetDTO(petVO)).thenReturn(expectedDTO);
-
-    PetDTO result = petService.getPetById(ID);
-
-    assertNotNull(result);
-    assertEquals(PET_NAME, result.getName());
-    assertNull(result.getStatus());
-  }
-
-  @Test
-  void getPetByIdWithEmptyNameShouldReturnEmptyString() {
-    var petVO = createPetVO("", STATUS_AVAILABLE);
-    var expectedDTO = new PetDTO(ID, "", STATUS_AVAILABLE);
-
-    setupGetPetMock(petVO);
-    when(petMapper.buildPetVOToPetDTO(petVO)).thenReturn(expectedDTO);
-
-    PetDTO result = petService.getPetById(ID);
-
-    assertNotNull(result);
-    assertEquals("", result.getName());
-  }
-
-  @Test
-  void savePetWithValidRequestShouldSucceed() {
+  void savePetSuccessfully() {
     var requestDTO = new PetSaveRequestDTO(ID, PET_NAME, STATUS_AVAILABLE);
-    var createdPetVO = createPetVO(PET_NAME, STATUS_AVAILABLE);
-    var expectedDTO = new PetDTO(ID, PET_NAME, STATUS_AVAILABLE);
+    var createdPetVO = createPetVO();
 
-    setupGetPetMock(null);
-    when(petMapper.buildPetVOToPetDTO(null)).thenReturn(null);
+    when(this.petExternalService.findById(anyLong())).thenThrow(PetNotFoundException.class);
+    when(this.petExternalService.save(any())).thenReturn(createdPetVO);
 
-    var postSpec = mock(RestClient.RequestBodyUriSpec.class);
-    var postResponseSpec = mock(RestClient.ResponseSpec.class);
-
-    when(restClient.post()).thenReturn(postSpec);
-    when(postSpec.contentType(any())).thenReturn(postSpec);
-    when(postSpec.accept(any())).thenReturn(postSpec);
-    when(postSpec.body(any(Object.class))).thenReturn(postSpec);
-    when(postSpec.retrieve()).thenReturn(postResponseSpec);
-    when(postResponseSpec.onStatus(any(), any())).thenReturn(postResponseSpec);
-    when(postResponseSpec.body(PetVO.class)).thenReturn(createdPetVO);
-
-    when(petMapper.buildPetSaveRequestDTOToPetVO(requestDTO)).thenReturn(createdPetVO);
-    when(petMapper.buildPetVOToPetDTO(createdPetVO)).thenReturn(expectedDTO);
-
-    PetDTO result = petService.savePet(requestDTO);
+    PetSaveResponseDTO result = this.petService.savePet(requestDTO);
 
     assertNotNull(result);
-    assertEquals(ID, result.getId());
+    assertNotNull(result.getDateCreated());
+    assertNotNull(result.getTransactionId());
     assertEquals(PET_NAME, result.getName());
   }
 
   @Test
   void savePetWithExistingPetShouldThrowPetExistException() {
     var requestDTO = new PetSaveRequestDTO(ID, PET_NAME, STATUS_AVAILABLE);
-    var existingPetVO = createPetVO(PET_NAME, STATUS_AVAILABLE);
-    var existingDTO = new PetDTO(ID, PET_NAME, STATUS_AVAILABLE);
+    var existingPetVO = createPetVO();
 
-    setupGetPetMock(existingPetVO);
-    when(petMapper.buildPetVOToPetDTO(existingPetVO)).thenReturn(existingDTO);
+    when(this.petExternalService.findById(anyLong())).thenReturn(Optional.of(existingPetVO));
 
-    assertThrows(PetExistException.class, () -> petService.savePet(requestDTO));
+    assertThrows(PetExistException.class, () -> this.petService.savePet(requestDTO));
   }
 
   @Test
-  void savePetWithPostExceptionShouldThrowPetException() {
+  void savePetErrorServerShouldThrowPetException() {
     var requestDTO = new PetSaveRequestDTO(ID, PET_NAME, STATUS_AVAILABLE);
-    var petVO = createPetVO(PET_NAME, STATUS_AVAILABLE);
 
-    setupGetPetMock(null);
-    when(petMapper.buildPetVOToPetDTO(null)).thenReturn(null);
+    when(this.petExternalService.findById(anyLong())).thenThrow(PetNotFoundException.class);
+    when(this.petExternalService.save(any())).thenThrow(PetException.class);
 
-    var postSpec = mock(RestClient.RequestBodyUriSpec.class);
-    var postResponseSpec = mock(RestClient.ResponseSpec.class);
-
-    when(restClient.post()).thenReturn(postSpec);
-    when(postSpec.contentType(any())).thenReturn(postSpec);
-    when(postSpec.accept(any())).thenReturn(postSpec);
-    when(postSpec.body(any(Object.class))).thenReturn(postSpec);
-    when(postSpec.retrieve()).thenReturn(postResponseSpec);
-    when(postResponseSpec.onStatus(any(), any())).thenReturn(postResponseSpec);
-    when(postResponseSpec.body(PetVO.class)).thenThrow(new RestClientException("Error"));
-
-    when(petMapper.buildPetSaveRequestDTOToPetVO(requestDTO)).thenReturn(petVO);
-
-    assertThrows(RestClientException.class, () -> petService.savePet(requestDTO));
+    assertThrows(PetException.class, () -> this.petService.savePet(requestDTO));
   }
 
-  @SuppressWarnings("unchecked")
-  private void setupGetPetMock(PetVO responsePetVO) {
-    var uriSpec = mock(RestClient.RequestHeadersUriSpec.class);
-    var responseSpec = mock(RestClient.ResponseSpec.class);
-
-    when(restClient.get()).thenReturn(uriSpec);
-    when(uriSpec.uri("/{petId}", ID)).thenReturn(uriSpec);
-    when(uriSpec.accept(any())).thenReturn(uriSpec);
-    when(uriSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.onStatus(any(), any())).thenReturn(responseSpec);
-    when(responseSpec.body(PetVO.class)).thenReturn(responsePetVO);
+  private PetVO createPetVO() {
+    var petVO = new PetVO();
+    petVO.setId(PetServiceImplTest.ID);
+    petVO.setName(PetServiceImplTest.PET_NAME);
+    petVO.setStatus(PetServiceImplTest.STATUS_AVAILABLE);
+    return petVO;
   }
 
 

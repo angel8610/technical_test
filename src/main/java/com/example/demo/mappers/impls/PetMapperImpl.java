@@ -22,14 +22,5 @@ public class PetMapperImpl implements PetMapper {
     return new PetDTO(petVO.getId(), petVO.getName(), petVO.getStatus());
   }
 
-  @Override
-  public PetVO buildPetSaveRequestDTOToPetVO(PetSaveRequestDTO petSaveRequestDTO) {
-    var category = new CategoryVO(0L, "category");
-    var photoUrls = Set.of("url1");
-    var tags = Set.of(new TagVO(0L, "tag"));
-    return new PetVO(petSaveRequestDTO.id(), category, petSaveRequestDTO.name(), photoUrls,
-      tags, petSaveRequestDTO.status());
-  }
-
 
 }

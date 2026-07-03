@@ -14,6 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,16 +51,6 @@ class PetControllerTest {
   }
 
   @Test
-  void getPetShouldCallServiceWithCorrectId() {
-    PetDTO dto = new PetDTO(ID, "PetName", "available");
-    when(petService.getPetById(ID)).thenReturn(dto);
-
-    petController.getPet(ID);
-
-    verify(petService).getPetById(eq(ID));
-  }
-
-  @Test
   void getPetWhenServiceThrowsPetNotFoundShouldPropagate() {
     when(petService.getPetById(ID)).thenThrow(new PetNotFoundException("Not found"));
 
@@ -76,8 +69,7 @@ class PetControllerTest {
   @Test
   void savePetReturnsOkWithPetSaveResponseDTO() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
-    when(petService.savePet(requestDTO)).thenReturn(petDTO);
+    when(petService.savePet(requestDTO)).thenReturn(this.createPetResponse());
 
     ResponseEntity<PetSaveResponseDTO> resp = petController.savePet(requestDTO);
 
@@ -98,12 +90,11 @@ class PetControllerTest {
   @Test
   void savePetShouldCallServiceWithCorrectDTO() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
-    when(petService.savePet(requestDTO)).thenReturn(petDTO);
+    when(petService.savePet(requestDTO)).thenReturn(this.createPetResponse());
 
     petController.savePet(requestDTO);
 
-    verify(petService).savePet(eq(requestDTO));
+    verify(petService).savePet(refEq(requestDTO));
   }
 
   @Test
@@ -118,13 +109,19 @@ class PetControllerTest {
   @Test
   void savePetResponseIsNotNull() {
     PetSaveRequestDTO requestDTO = new PetSaveRequestDTO(ID, "PetName", "available");
-    PetDTO petDTO = new PetDTO(ID, "PetName", "available");
-    when(petService.savePet(requestDTO)).thenReturn(petDTO);
+    when(petService.savePet(requestDTO)).thenReturn(this.createPetResponse());
 
     ResponseEntity<PetSaveResponseDTO> resp = petController.savePet(requestDTO);
 
     assertNotNull(resp.getBody());
     assertEquals("PetName", resp.getBody().getName());
+  }
+
+  private PetSaveResponseDTO createPetResponse() {
+    Instant instant = Instant.parse("2019-08-20T00:00:00.00Z");
+    Clock clock = Clock.fixed(instant, ZoneId.of("UTC"));
+    return new PetSaveResponseDTO("trs1-0001", LocalDateTime.now(clock),
+      true, "PetName");
   }
 
 

@@ -9,11 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("api/pet")
 public class PetController {
@@ -32,15 +27,8 @@ public class PetController {
   @PostMapping(produces = "application/json")
   public ResponseEntity<PetSaveResponseDTO> savePet(
       @Valid @RequestBody PetSaveRequestDTO petSaveRequestDTO) {
-    PetDTO petDTO = this.petService.savePet(petSaveRequestDTO);
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      this.buildResponseSave(petDTO));
-  }
-
-  private PetSaveResponseDTO buildResponseSave(PetDTO petDTO) {
-    var uuid = UUID.randomUUID().toString();
-    var localDateTime = LocalDateTime.now(ZoneId.of("UTC"));
-    return new PetSaveResponseDTO(uuid, localDateTime, true, petDTO.getName());
+      this.petService.savePet(petSaveRequestDTO));
   }
 
 

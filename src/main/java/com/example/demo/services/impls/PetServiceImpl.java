@@ -2,19 +2,22 @@ package com.example.demo.services.impls;
 
 import com.example.demo.dtos.PetDTO;
 import com.example.demo.dtos.PetSaveRequestDTO;
-import com.example.demo.exceptions.PetException;
+import com.example.demo.dtos.PetSaveResponseDTO;
 import com.example.demo.exceptions.PetExistException;
 import com.example.demo.exceptions.PetNotFoundException;
 import com.example.demo.mappers.PetMapper;
+import com.example.demo.services.PetExternalService;
 import com.example.demo.services.PetService;
+import com.example.demo.vos.CategoryVO;
 import com.example.demo.vos.PetVO;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
+import com.example.demo.vos.TagVO;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 @Service
@@ -24,65 +27,54 @@ public class PetServiceImpl implements PetService {
 
   private final PetMapper petMapper;
 
-  private final RestClient restClient;
+  private final PetExternalService petExternalService;
 
-  public PetServiceImpl(PetMapper petMapper, RestClient restClient) {
+  public PetServiceImpl(PetMapper petMapper, PetExternalService petExternalService) {
     this.petMapper = petMapper;
-    this.restClient = restClient;
+    this.petExternalService = petExternalService;
   }
 
   @Override
   public PetDTO getPetById(Long id) {
-    Optional<PetDTO> petDTOOptional = this.searchExternalPetById(id);
+    Optional<PetVO> petVOOptional = this.petExternalService.findById(id);
 
-    if(petDTOOptional.isEmpty()) {
+    if(petVOOptional.isEmpty()) {
       throw new PetNotFoundException("Pet not found with id: " + id);
     }
 
-    var petDTO = petDTOOptional.get();
+    var petVO = petVOOptional.get();
+    var petDTO = this.petMapper.buildPetVOToPetDTO(petVO);
     LOGGER.info(petDTO.toString());
     return petDTO;
   }
 
   @Override
-  public PetDTO savePet(PetSaveRequestDTO petSaveRequestDTO) {
+  public PetSaveResponseDTO savePet(PetSaveRequestDTO petSaveRequestDTO) {
     Long id = petSaveRequestDTO.id();
 
-    Optional<PetDTO> petDTOSearch = this.searchExternalPetById(id);
-    if(petDTOSearch.isPresent()) {
-      throw new PetExistException("Pet already exists with id:" + id);
+    try {
+      Optional<PetVO> petDTOSearch = this.petExternalService.findById(id);
+      if(petDTOSearch.isPresent()) {
+        throw new PetExistException("Pet already exists with id:" + id);
+      }
+    } catch (PetNotFoundException e) {
+      LOGGER.info(e.getMessage());
     }
 
-    PetVO petVO = this.restClient.post()
-      .contentType(MediaType.APPLICATION_JSON)
-      .accept(MediaType.APPLICATION_JSON)
-      .body(this.petMapper.buildPetSaveRequestDTOToPetVO(petSaveRequestDTO))
-      .retrieve()
-      .onStatus(HttpStatusCode::is4xxClientError, ((request, response) -> {
-        throw new PetException("External validation error");
-      }))
-      .onStatus(HttpStatusCode::is5xxServerError, ((request, response) -> {
-        throw new PetException("Temporary external server error");
-      }))
-      .body(PetVO.class);
-
-    return this.petMapper.buildPetVOToPetDTO(petVO);
+    PetVO petVO = this.petExternalService.save(this.buildPetSaveRequestDTOToPetVO(
+      petSaveRequestDTO));
+    var uuid = UUID.randomUUID().toString();
+    var localDateTime = LocalDateTime.now(ZoneId.of("UTC"));
+    assert petVO != null;
+    return new PetSaveResponseDTO(uuid, localDateTime, true, petVO.getName());
   }
 
-  private Optional<PetDTO> searchExternalPetById(Long id) {
-    try {
-      PetVO petVO = this.restClient.get()
-        .uri("/{petId}", id)
-        .accept(MediaType.APPLICATION_JSON)
-        .retrieve()
-        .onStatus(HttpStatusCode::isError, (request, response) -> {
-          throw new PetException("External server error");
-        })
-        .body(PetVO.class);
-      return Optional.ofNullable(this.petMapper.buildPetVOToPetDTO(petVO));
-    } catch(RestClientException | PetException ex) {
-      return Optional.empty();
-    }
+  private PetVO buildPetSaveRequestDTOToPetVO(PetSaveRequestDTO petSaveRequestDTO) {
+    var category = new CategoryVO(0L, "category");
+    var photoUrls = Set.of("url1");
+    var tags = Set.of(new TagVO(0L, "tag"));
+    return new PetVO(petSaveRequestDTO.id(), category, petSaveRequestDTO.name(), photoUrls,
+      tags, petSaveRequestDTO.status());
   }
 
 

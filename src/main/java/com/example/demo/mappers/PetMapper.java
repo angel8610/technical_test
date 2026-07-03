@@ -8,7 +8,5 @@ public interface PetMapper {
 
   PetDTO buildPetVOToPetDTO(PetVO petVO);
 
-  PetVO buildPetSaveRequestDTOToPetVO(PetSaveRequestDTO petSaveRequestDTO);
-
 
 }
