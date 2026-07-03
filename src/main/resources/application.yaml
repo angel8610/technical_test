@@ -4,4 +4,16 @@ spring:
 
 api:
   external:
-    baseUrl: https://petstore.swagger.io/v2/pet
+    baseUrl: https://petstore.swagger.i/v2/pet
+
+resilience4j:
+  retry:
+    instances:
+      demoApiRetry:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException

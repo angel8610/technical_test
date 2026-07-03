@@ -4,6 +4,7 @@ import com.example.demo.exceptions.PetException;
 import com.example.demo.exceptions.PetNotFoundException;
 import com.example.demo.services.PetExternalService;
 import com.example.demo.vos.PetVO;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -22,6 +23,7 @@ public class PetExternalServiceImpl implements PetExternalService {
   }
 
   @Override
+  @Retry(name = "demoApiRetry", fallbackMethod = "connectTimeout")
   public Optional<PetVO> findById(Long petId) {
     PetVO petVO = this.restClient.get()
       .uri("/{petId}", petId)
@@ -38,6 +40,7 @@ public class PetExternalServiceImpl implements PetExternalService {
   }
 
   @Override
+  @Retry(name = "demoApiRetry", fallbackMethod = "connectTimeout")
   public PetVO save(PetVO petVO) {
     return this.restClient.post()
       .contentType(MediaType.APPLICATION_JSON)
@@ -51,6 +54,10 @@ public class PetExternalServiceImpl implements PetExternalService {
         throw new PetException("Temporary external server error");
       }))
       .body(PetVO.class);
+  }
+  private void connectTimeout(Exception ex) {
+    System.out.println("Error con: "+ex.getMessage());
+    throw new PetException("External server error");
   }
 
 

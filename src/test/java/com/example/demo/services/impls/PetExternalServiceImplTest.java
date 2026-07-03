@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestClient;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,10 +24,22 @@ class PetExternalServiceImplTest {
   private static final String PET_NAME = "PetName";
   private static final String STATUS_AVAILABLE = "available";
 
+  private static Wire
+
   @Mock
   private RestClient restClient;
 
   private PetExternalService petExternalService;
+
+  @TestConfiguration
+  static class TestConfig {
+    @Bean
+    public RestClient restClient() {
+      return RestClient.builder()
+        .baseUrl("http://localhost:8089")
+        .build();
+    }
+  }
 
   @BeforeEach
   void setUp() {
