@@ -4,6 +4,7 @@ import com.example.demo.exceptions.PetException;
 import com.example.demo.exceptions.PetNotFoundException;
 import com.example.demo.services.PetExternalService;
 import com.example.demo.vos.PetVO;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,8 +25,6 @@ class PetExternalServiceImplTest {
   private static final String PET_NAME = "PetName";
   private static final String STATUS_AVAILABLE = "available";
 
-  private static Wire
-
   @Mock
   private RestClient restClient;
 
@@ -43,7 +42,7 @@ class PetExternalServiceImplTest {
 
   @BeforeEach
   void setUp() {
-    petExternalService = new PetExternalServiceImpl(restClient);
+    petExternalService = new PetExternalServiceImpl(restClient, RetryRegistry.ofDefaults());
   }
 
   @Test
