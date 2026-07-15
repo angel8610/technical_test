@@ -1,7 +1,9 @@
 package com.example.demo.services.impls;
 
+import com.example.demo.exceptions.PetClientException;
 import com.example.demo.exceptions.PetException;
 import com.example.demo.exceptions.PetNotFoundException;
+import com.example.demo.exceptions.PetServerException;
 import com.example.demo.services.PetExternalService;
 import com.example.demo.vos.PetVO;
 import io.github.resilience4j.retry.Retry;
@@ -14,8 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
-import java.rmi.RemoteException;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -56,21 +58,24 @@ public class PetExternalServiceImpl implements PetExternalService {
           .onStatus(status -> status == HttpStatus.NOT_FOUND, ((request, response) -> {
             throw new PetNotFoundException("Not Fund pet with ID: ".concat(petId.toString()));
           }))
-          .onStatus(HttpStatusCode::isError, (request, response) -> {
-            throw new PetException("External server error");
+          .onStatus(HttpStatusCode::is4xxClientError, ((request, response) -> {
+            throw new PetClientException("Error client, please check the request again");
+          }))
+          .onStatus(HttpStatusCode::is5xxServerError, (request, response) -> {
+            throw new PetServerException("External server error");
           })
           .body(PetVO.class);
-
-        assert petVO != null;
-        stopped = !context.onResult(petVO);
-      } catch(ResourceAccessException ex) {
+        stopped = !context.onResult(Objects.requireNonNull(petVO));
+      } catch(PetNotFoundException | PetClientException ex) {
+        throw new PetException(ex.getMessage());
+      } catch(ResourceAccessException | PetServerException ex) {
         this.managerContextThrowException(context, ex);
       }
     } while(!stopped);
     context.onComplete();
     LOGGER.info("Successfully search");
 
-    return Optional.ofNullable(petVO);
+    return Optional.of(petVO);
   }
 
   @Override
@@ -88,15 +93,16 @@ public class PetExternalServiceImpl implements PetExternalService {
           .body(petVO)
           .retrieve()
           .onStatus(HttpStatusCode::is4xxClientError, ((request, response) -> {
-            throw new RuntimeException("External validation error");
+            throw new PetClientException("External validation error");
           }))
           .onStatus(HttpStatusCode::is5xxServerError, ((request, response) -> {
-            throw new PetException("Temporary external server error");
+            throw new PetServerException("Temporary external server error");
           }))
           .body(PetVO.class);
-        assert petVOSave != null;
-        stopped = !context.onResult(petVOSave);
-      } catch(ResourceAccessException ex) {
+        stopped = !context.onResult(Objects.requireNonNull(petVOSave));
+      } catch(PetClientException ex) {
+        throw new PetException(ex.getMessage());
+      } catch(ResourceAccessException | PetServerException ex) {
         this.managerContextThrowException(context, ex);
       }
     } while(!stopped);
