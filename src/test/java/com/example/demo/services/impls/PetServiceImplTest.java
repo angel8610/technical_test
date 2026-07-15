@@ -30,7 +30,6 @@ class PetServiceImplTest {
 
   @Mock
   private PetExternalService petExternalService;
-
   @Mock
   private PetMapper petMapper;
 
